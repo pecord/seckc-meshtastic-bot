@@ -23,10 +23,10 @@ A Python bot framework for Meshtastic mesh networks with swappable "personalitie
     ┌────┴──────┬──────────┬──────────────┐
     │           │          │              │
     ▼           ▼          ▼              ▼
-┌────────┐ ┌─────────┐ ┌────────┐  ┌──────────┐
+┌────────┐ ┌──────────┐ ┌────────┐  ┌───────────┐
 │Database│ │Meshtastic│ │ Ollama │  │Personality│
-│Service │ │ Service │ │Service │  │  Layer   │
-└────────┘ └─────────┘ └────────┘  └──────────┘
+│Service │ │ Service  │ │Service │  │  Layer    │
+└────────┘ └──────────┘ └────────┘  └───────────┘
     │           │           │             │
     ▼           ▼           ▼             ▼
 [SQLite]  [USB Device] [Local LLM]  [Game Logic]
@@ -43,7 +43,7 @@ A Python bot framework for Meshtastic mesh networks with swappable "personalitie
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/seckc-meshtastic-bot
+git clone https://github.com/pecord/seckc-meshtastic-bot
 cd seckc-meshtastic-bot
 
 # Create virtual environment
