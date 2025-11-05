@@ -270,12 +270,12 @@ class MeshtasticBot:
         print("(Press Ctrl+C to cancel)\n")
         
         try:
-            # Connect using the service
+            # Connect using the service with 15 second timeout
             self.meshtastic.connect(
                 on_receive=self.on_receive,
                 on_connection=self.on_connection,
                 on_connection_lost=self.on_connection_lost,
-                timeout=30
+                timeout=15
             )
             
             # Keep running
@@ -305,11 +305,8 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
-  # Run with auto-detected device
+  # Run with default settings (auto-detects device)
   python bot.py
-  
-  # Specify device path
-  python bot.py --device /dev/ttyUSB0
   
   # Use custom Ollama settings
   python bot.py --ollama-host http://192.168.1.100:11434 --ollama-model llama2

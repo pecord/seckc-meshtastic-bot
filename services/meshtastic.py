@@ -57,6 +57,8 @@ class MeshtasticService:
         def _connect():
             try:
                 print("🔌 Auto-detecting Meshtastic device...")
+                # Only try serial connection, not TCP
+                # This prevents hanging on TCP when no device is connected
                 result['interface'] = meshtastic.serial_interface.SerialInterface()
             except Exception as e:
                 error['error'] = e
@@ -68,7 +70,7 @@ class MeshtasticService:
         start_time = time.time()
         while connect_thread.is_alive():
             if time.time() - start_time > timeout:
-                raise TimeoutError(f"Connection timeout after {timeout} seconds")
+                raise TimeoutError(f"Connection timeout after {timeout} seconds. Is your Meshtastic device connected via USB?")
             time.sleep(0.1)
         
         # Check results
@@ -176,5 +178,9 @@ class MeshtasticService:
     def close(self):
         """Close the connection"""
         if self.interface:
-            self.interface.close()
+            try:
+                self.interface.close()
+            except (AttributeError, Exception):
+                # Interface might not be fully initialized
+                pass
             self.interface = None

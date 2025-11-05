@@ -138,9 +138,6 @@ cp .env.example .env
 # Auto-detect device and use default settings
 python bot.py
 
-# Specify device path
-python bot.py --device /dev/ttyUSB0
-
 # Use custom Ollama settings
 python bot.py --ollama-model llama3.2:3b --ollama-host http://localhost:11434
 
@@ -153,10 +150,6 @@ python bot.py --help
 The bot supports the following CLI arguments (override .env settings):
 
 ```
-  --device PATH, -d PATH
-      Path to Meshtastic device (e.g., /dev/ttyUSB0, COM3)
-      Auto-detects if not specified
-  
   --ollama-host URL
       Ollama server URL (default: http://localhost:11434)
   
@@ -164,17 +157,15 @@ The bot supports the following CLI arguments (override .env settings):
       Ollama model to use (default: gpt-oss:20b)
 ```
 
+**Note:** The bot automatically detects your Meshtastic device via USB - no manual path needed!
+
 ### Examples
 
 ```bash
-# Auto-detect everything
+# Run with defaults (auto-detect device)
 python bot.py
 
-# Specify device path
-python bot.py --device /dev/ttyUSB0
-python bot.py -d COM3
-
-# Custom Ollama
+# Custom Ollama model
 python bot.py --ollama-model llama2
 python bot.py -m llama3.2:3b --ollama-host http://192.168.1.100:11434
 
