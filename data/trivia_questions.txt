@@ -1,0 +1,73 @@
+Q: What is the capital of France?
+A: paris
+
+Q: What is 2 + 2?
+A: 4
+A: four
+
+Q: What color is the sky on a clear day?
+A: blue
+
+Q: How many days are in a week?
+A: 7
+A: seven
+
+Q: What is the largest planet in our solar system?
+A: jupiter
+
+Q: What is the opposite of hot?
+A: cold
+
+Q: How many legs does a spider have?
+A: 8
+A: eight
+
+Q: What is the capital of the United States?
+A: washington
+A: washington dc
+A: washington d.c.
+
+Q: What is 10 x 10?
+A: 100
+A: one hundred
+
+Q: What animal is known as man's best friend?
+A: dog
+A: dogs
+
+Q: What color do you get when you mix red and blue?
+A: purple
+A: violet
+
+Q: What is the fastest land animal?
+A: cheetah
+
+Q: How many sides does a triangle have?
+A: 3
+A: three
+
+Q: What is frozen water called?
+A: ice
+
+Q: What planet is known as the Red Planet?
+A: mars
+
+Q: What is the tallest mountain in the world?
+A: everest
+A: mount everest
+A: mt everest
+
+Q: What is the name of our galaxy?
+A: milky way
+A: the milky way
+
+Q: How many cents are in a dollar?
+A: 100
+A: one hundred
+
+Q: What is the square root of 16?
+A: 4
+A: four
+
+Q: What is the chemical symbol for water?
+A: h2o
