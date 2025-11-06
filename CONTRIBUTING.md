@@ -11,10 +11,10 @@ seckc-meshtastic-bot/
 │   ├── base.py              # Base class for new personalities
 │   └── trivia.py            # Trivia game implementation
 ├── services/                # External integrations
-│   ├── config.py            # Configuration loading
-│   ├── database.py          # SQLite wrapper
-│   ├── meshtastic.py        # Device/messaging
-│   └── ollama.py            # AI chat
+│   ├── config.py             # Environment config
+│   ├── database.py          # SQLite
+│   ├── meshtastic.py        # Device I/O
+│   └── llm.py               # AI chat
 └── data/
     ├── trivia_questions.txt # Question bank
     └── bot.db              # SQLite database (auto-created)
@@ -114,7 +114,7 @@ A: answer
 Services are modular and easy to extend:
 
 - **`services/meshtastic.py`** - Add new messaging features
-- **`services/ollama.py`** - Customize AI behavior
+- **`services/llm.py`** - Customize AI behavior
 - **`services/database.py`** - Add new tables/queries
 
 Each service is self-contained with clear interfaces.

@@ -8,15 +8,15 @@ for easy extension.
 
 Features:
 - Trivia game with leaderboard
-- Local AI chat via Ollama
+- AI chat via any OpenAI-compatible API (Ollama, OpenAI, etc.)
 - Channel-based routing
 - SQLite persistence
 - Anti-cheat system
 
 Usage:
-    python bot.py                              # Auto-detect device
-    python bot.py --ollama-model llama3.2:3b   # Custom model
-    python bot.py --ollama-host http://...:11434  # Remote Ollama
+    python bot.py                              # Auto-detect device, use local Ollama
+    python bot.py --llm-model llama3.2:3b      # Custom Ollama model
+    python bot.py --llm-base-url https://api.openai.com/v1 --llm-model gpt-4 --llm-api-key sk-...
 """
 import sys
 import argparse
@@ -26,7 +26,7 @@ import time
 from services.database import BotDatabase
 from personalities.trivia import TriviaPersonality
 from services.meshtastic import MeshtasticService
-from services.ollama import OllamaService
+from services.llm import LLMService
 from services import config
 
 
@@ -35,39 +35,41 @@ class MeshtasticBot:
     Main bot orchestrator.
     
     Coordinates between Meshtastic device, personality modules,
-    and external services like Ollama.
+    and external services like LLM providers.
     """
     
-    def __init__(self, ollama_host=None, ollama_model=None):
+    def __init__(self, llm_base_url=None, llm_model=None, llm_api_key=None):
         """
         Initialize bot with optional configuration overrides.
         
         Args:
-            ollama_host: Ollama API URL (overrides .env)
-            ollama_model: Ollama model name (overrides .env)
+            llm_base_url: OpenAI-compatible API base URL (overrides .env)
+            llm_model: Model name (overrides .env)
+            llm_api_key: API key for the LLM service (overrides .env)
         """
         # Initialize services
         self.meshtastic = MeshtasticService()
-        self.ollama = OllamaService(
-            host=ollama_host or config.OLLAMA_HOST,
-            model=ollama_model or config.OLLAMA_MODEL
+        self.llm = LLMService(
+            base_url=llm_base_url or config.LLM_BASE_URL,
+            model=llm_model or config.LLM_MODEL,
+            api_key=llm_api_key or config.LLM_API_KEY
         )
         
         # Store config for display
-        self.ollama_host = self.ollama.host
-        self.ollama_model = self.ollama.model
+        self.llm_host = self.llm.base_url
+        self.llm_model = self.llm.model
         
         # Initialize database and personality
         self.db = BotDatabase(db_path=config.DATABASE_PATH)
         self.personality = TriviaPersonality(
             self.db, 
             questions_file=config.TRIVIA_QUESTIONS_FILE,
-            ollama_service=self.ollama
+            llm_service=self.llm
         )
         
         # Runtime state
-        self.ollama_channel_name = config.OLLAMA_CHANNEL_NAME
-        self.ollama_channel_index = None
+        self.llm_channel_name = config.LLM_CHANNEL_NAME
+        self.llm_channel_index = None
         self.shutdown_requested = False
     
     def signal_handler(self, signum, frame):
@@ -84,8 +86,8 @@ class MeshtasticBot:
         Handle incoming messages from the mesh network.
         
         Routes messages based on channel:
-        - DMs (channel 0): All commands (!trivia, !leaderboard, !ollama, !help)
-        - Configured channel: !ollama only (for public AI chat)
+        - DMs (channel 0): All commands (!trivia, !leaderboard, !llm, !help)
+        - Configured channel: !llm only (for public AI chat)
         - Other channels: Ignored
         
         Args:
@@ -121,16 +123,16 @@ class MeshtasticBot:
         
         print(f"📨 [Ch {channel}] [{sender_name}]: {text}")
         
-        # Check if this is a DM (channel 0) or the configured Ollama channel
+        # Check if this is a DM (channel 0) or the configured LLM channel
         is_dm = channel == 0
-        is_ollama_command = text.lower().strip().startswith('!ollama ')
-        is_ollama_channel = (self.ollama_channel_index is not None and 
-                            channel == self.ollama_channel_index)
+        is_llm_command = text.lower().strip().startswith('!llm ')
+        is_llm_channel = (self.llm_channel_index is not None and 
+                            channel == self.llm_channel_index)
         
-        # Handle !ollama command
+        # Handle !llm command
         # - On DMs: always respond via DM (for testing)
         # - On configured channel: respond to that channel
-        if is_ollama_command:
+        if is_llm_command:
             response = self.personality.handle_message(text, sender_id, sender_name)
             if response:
                 if is_dm:
@@ -143,9 +145,9 @@ class MeshtasticBot:
                             time.sleep(0.5)
                     else:
                         self.meshtastic.send_text(response, destination=sender_id)
-                elif is_ollama_channel:
+                elif is_llm_channel:
                     # Channel response
-                    print(f"🤖 Replying to channel {channel} ({self.ollama_channel_name}): {response}")
+                    print(f"🤖 Replying to channel {channel} ({self.llm_channel_name}): {response}")
                     if len(response) > 200:
                         chunks = [response[i:i+200] for i in range(0, len(response), 200)]
                         for chunk in chunks:
@@ -154,8 +156,8 @@ class MeshtasticBot:
                     else:
                         self.meshtastic.send_text(response, channel_index=channel)
                 else:
-                    # !ollama on wrong channel, ignore
-                    print(f"⚠️  Ignoring !ollama on channel {channel} (not DM or '{self.ollama_channel_name}')")
+                    # !llm on wrong channel, ignore
+                    print(f"⚠️  Ignoring !llm on channel {channel} (not DM or '{self.llm_channel_name}')")
             return
         
         # For all other commands (trivia, leaderboard, etc.), only respond to DMs
@@ -205,20 +207,20 @@ class MeshtasticBot:
             print(f"Device Path: {self.meshtastic.device_path}")
         
         # Find the channel by name
-        self.ollama_channel_index = self.meshtastic.find_channel_by_name(self.ollama_channel_name)
-        if self.ollama_channel_index is not None:
-            print(f"✅ Found channel '{self.ollama_channel_name}' at index {self.ollama_channel_index}")
+        self.llm_channel_index = self.meshtastic.find_channel_by_name(self.llm_channel_name)
+        if self.llm_channel_index is not None:
+            print(f"✅ Found channel '{self.llm_channel_name}' at index {self.llm_channel_index}")
         else:
-            print(f"⚠️  Channel '{self.ollama_channel_name}' not found - !ollama will only work in DMs")
+            print(f"⚠️  Channel '{self.llm_channel_name}' not found - !llm will only work in DMs")
         
         # Ask first question (for internal state, don't broadcast)
         msg, _ = self.personality.ask_new_question()
         
         print("\n📡 LISTENING FOR:")
-        print(f"  • DMs: !trivia, !leaderboard, !ollama, !help")
+        print(f"  • DMs: !trivia, !leaderboard, !llm, !help")
         
-        if self.ollama_channel_index is not None:
-            print(f"  • #{self.ollama_channel_name}: !ollama commands")
+        if self.llm_channel_index is not None:
+            print(f"  • #{self.llm_channel_name}: !llm commands")
         
         print(f"\n💡 Ready! Current question: {msg}")
         print("="*60 + "\n")
@@ -260,9 +262,9 @@ class MeshtasticBot:
         print("🚀 MESHTASTIC BOT STARTING")
         print("="*60)
         print(f"Personality: {self.personality.name}")
-        print(f"Ollama Host: {self.ollama_host}")
-        print(f"Ollama Model: {self.ollama_model}")
-        print(f"Target Channel: '{self.ollama_channel_name}'")
+        print(f"LLM Endpoint: {self.llm_host}")
+        print(f"LLM Model: {self.llm_model}")
+        print(f"Target Channel: '{self.llm_channel_name}'")
         print(f"Database: {config.DATABASE_PATH}")
         print("="*60)
         
@@ -305,30 +307,40 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
-  # Run with default settings (auto-detects device)
+  # Run with default settings (auto-detects device, uses local Ollama)
   python bot.py
   
-  # Use custom Ollama settings
-  python bot.py --ollama-host http://192.168.1.100:11434 --ollama-model llama2
+  # Use custom LLM settings (Ollama)
+  python bot.py --llm-base-url http://192.168.1.100:11434/v1 --llm-model llama3.2:3b
+  
+  # Use OpenAI
+  python bot.py --llm-base-url https://api.openai.com/v1 --llm-model gpt-4 --llm-api-key sk-...
         '''
     )
     
     parser.add_argument(
-        '--ollama-host',
+        '--llm-base-url',
         metavar='URL',
-        help=f'Ollama server URL (default: {config.OLLAMA_HOST})'
+        help=f'OpenAI-compatible API base URL (default: {config.LLM_BASE_URL})'
     )
     
     parser.add_argument(
-        '--ollama-model', '-m',
+        '--llm-model', '-m',
         metavar='MODEL',
-        help=f'Ollama model to use (default: {config.OLLAMA_MODEL})'
+        help=f'Model to use (default: {config.LLM_MODEL})'
+    )
+    
+    parser.add_argument(
+        '--llm-api-key',
+        metavar='KEY',
+        help='API key for LLM service (default: from .env or "ollama")'
     )
     
     args = parser.parse_args()
     
     bot = MeshtasticBot(
-        ollama_host=args.ollama_host,
-        ollama_model=args.ollama_model
+        llm_base_url=args.llm_base_url,
+        llm_model=args.llm_model,
+        llm_api_key=args.llm_api_key
     )
     bot.run()

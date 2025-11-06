@@ -19,7 +19,8 @@ except ImportError:
 DATABASE_PATH = os.getenv('DATABASE_PATH', 'data/bot.db')
 TRIVIA_QUESTIONS_FILE = os.getenv('TRIVIA_QUESTIONS_FILE', 'data/trivia_questions.txt')
 
-# Ollama settings
-OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
-OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'gpt-oss:20b')
-OLLAMA_CHANNEL_NAME = os.getenv('OLLAMA_CHANNEL_NAME', 'SecKC-Test')
+# LLM settings (OpenAI-compatible endpoints)
+LLM_API_KEY = os.getenv('LLM_API_KEY', 'ollama')  # Use 'ollama' as default for Ollama
+LLM_BASE_URL = os.getenv('LLM_BASE_URL', 'http://localhost:11434/v1/')  # OpenAI-compatible endpoint (note trailing slash)
+LLM_MODEL = os.getenv('LLM_MODEL', 'gpt-oss:20b')
+LLM_CHANNEL_NAME = os.getenv('LLM_CHANNEL_NAME', 'SecKC-Test')

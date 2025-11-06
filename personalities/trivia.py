@@ -5,7 +5,7 @@ Features:
 - Multiple choice trivia questions
 - Persistent leaderboard
 - Anti-cheat (one answer per question per player)
-- AI chat integration via Ollama
+- AI chat integration via OpenAI-compatible LLM API
 - Message chunking for Meshtastic size limits
 """
 import random
@@ -20,21 +20,21 @@ class TriviaPersonality(Personality):
     - !trivia: Get a new question
     - !leaderboard: Show top scores
     - !help: Show available commands
-    - !ollama <question>: Ask AI (if available)
+    - !llm <question>: Ask AI (if available)
     
     Questions are loaded from a text file in Q:/A: format.
     Multiple answers per question are supported.
     """
     
     def __init__(self, database, questions_file="data/trivia_questions.txt", 
-                 ollama_service=None):
+                 llm_service=None):
         """
         Initialize trivia personality.
         
         Args:
             database: BotDatabase instance
             questions_file: Path to questions file (Q:/A: format)
-            ollama_service: OllamaService instance (optional)
+            llm_service: LLM service instance (optional)
         """
         super().__init__(database)
         self.name = "Trivia"
@@ -43,8 +43,8 @@ class TriviaPersonality(Personality):
         self.current_answers = []
         self.current_question_id = None
         
-        # Use injected Ollama service
-        self.ollama = ollama_service
+        # Use injected LLM service
+        self.llm = llm_service
     
     def load_questions(self, filepath):
         """
@@ -130,23 +130,23 @@ class TriviaPersonality(Personality):
         if text_lower in ['!help', '!commands']:
             return self.get_help()
         
-        # Command: Ollama chat
-        if text_lower.startswith('!ollama '):
-            if not self.ollama or not self.ollama.is_available():
-                return "❌ Ollama not available. Make sure it's running locally."
+        # Command: LLM chat
+        if text_lower.startswith('!llm '):
+            if not self.llm or not self.llm.is_available():
+                return "❌ LLM service not available. Check your configuration."
             
-            prompt = text[8:].strip()  # Get everything after "!ollama "
+            prompt = text[5:].strip()  # Get everything after "!llm "
             
             if not prompt:
-                return "🤖 Usage: !ollama <question>\nExample: !ollama what is meshtastic?"
+                return "🤖 Usage: !llm <question>\nExample: !llm what is meshtastic?"
             
             # Limit prompt length
             if len(prompt) > 500:
                 return "❌ Prompt too long! Keep it under 500 characters."
             
-            # Call Ollama service with system prompt for concise responses
+            # Call LLM service with system prompt for concise responses
             system_prompt = 'You are a helpful assistant on a low-bandwidth mesh network. Keep responses under 200 characters. Be concise and direct.'
-            answer = self.ollama.chat(prompt, system_prompt=system_prompt)
+            answer = self.llm.chat(prompt, system_prompt=system_prompt)
             
             # Truncate if still too long (Meshtastic has limits)
             if len(answer) > 220:
@@ -183,7 +183,7 @@ class TriviaPersonality(Personality):
 !leaderboard - Top scores
 !help - This message"""
         
-        if self.ollama and self.ollama.is_available():
-            help_text += "\n!ollama <question> - Ask AI"
+        if self.llm and self.llm.is_available():
+            help_text += "\n!llm <question> - Ask AI"
         
         return help_text
