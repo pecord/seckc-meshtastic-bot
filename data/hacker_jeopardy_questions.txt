@@ -1,0 +1,124 @@
+Q:100: What port does SSH use by default?
+A: 22
+A: twenty-two
+
+Q:100: What does HTTP stand for?
+A: hypertext transfer protocol
+A: hyper text transfer protocol
+
+Q:100: What is the default port for HTTPS?
+A: 443
+A: four forty-three
+
+Q:200: What does XSS stand for?
+A: cross-site scripting
+A: cross site scripting
+
+Q:200: What does SQL stand for?
+A: structured query language
+
+Q:200: What is the name of the attack where you overflow a memory buffer?
+A: buffer overflow
+A: buffer overrun
+
+Q:300: What port does DNS use?
+A: 53
+A: fifty-three
+
+Q:300: What hashing algorithm produces a 128-bit hash value?
+A: md5
+
+Q:300: What does CSRF stand for?
+A: cross-site request forgery
+A: cross site request forgery
+
+Q:300: What is the process of hiding data within other data called?
+A: steganography
+A: steg
+
+Q:400: What encryption protocol replaced SSL?
+A: tls
+A: transport layer security
+
+Q:400: What is the default port for SMB?
+A: 445
+A: four forty-five
+
+Q:400: What does MITM stand for?
+A: man in the middle
+A: man-in-the-middle
+
+Q:400: What is the name of the privilege escalation technique using sudo?
+A: sudo
+A: privilege escalation
+
+Q:500: What RFC defines HTTP/1.1?
+A: 2616
+A: rfc 2616
+A: rfc2616
+
+Q:500: What is the default port for RDP?
+A: 3389
+A: thirty-three eighty-nine
+
+Q:500: What does OSINT stand for?
+A: open source intelligence
+A: open-source intelligence
+
+Q:500: What is the CVE number for Heartbleed?
+A: cve-2014-0160
+A: 2014-0160
+
+Q:100: What command shows your IP address on Linux?
+A: ifconfig
+A: ip addr
+A: ip a
+
+Q:100: What file contains password hashes on Linux?
+A: /etc/shadow
+A: etc/shadow
+A: shadow
+
+Q:200: What tool is used for wireless network detection?
+A: aircrack
+A: aircrack-ng
+A: airodump
+
+Q:200: What does NAT stand for?
+A: network address translation
+
+Q:300: What is the name of the Metasploit payload that gives reverse shell?
+A: meterpreter
+A: reverse_tcp
+
+Q:300: What protocol does ping use?
+A: icmp
+A: internet control message protocol
+
+Q:400: What tool can be used to crack password hashes?
+A: hashcat
+A: john
+A: john the ripper
+
+Q:400: What is the default username for Postgres?
+A: postgres
+
+Q:500: What is the maximum size of a TCP packet header in bytes?
+A: 60
+A: sixty
+
+Q:500: What year was the first DEF CON held?
+A: 1993
+A: nineteen ninety-three
+
+Q:100: What does VPN stand for?
+A: virtual private network
+
+Q:200: What attack involves sending malformed packets to crash a system?
+A: denial of service
+A: dos
+A: ddos
+
+Q:300: What is the name of the Python web framework used for penetration testing?
+A: flask
+A: django

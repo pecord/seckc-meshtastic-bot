@@ -25,6 +25,7 @@ import time
 
 from services.database import BotDatabase
 from personalities.trivia import TriviaPersonality
+from personalities.hacker_jeopardy import HackerJeopardyPersonality
 from services.meshtastic import MeshtasticService
 from services.llm import LLMService
 from services import config
@@ -38,7 +39,7 @@ class MeshtasticBot:
     and external services like LLM providers.
     """
     
-    def __init__(self, llm_base_url=None, llm_model=None, llm_api_key=None):
+    def __init__(self, llm_base_url=None, llm_model=None, llm_api_key=None, personality_type='trivia'):
         """
         Initialize bot with optional configuration overrides.
         
@@ -46,6 +47,7 @@ class MeshtasticBot:
             llm_base_url: OpenAI-compatible API base URL (overrides .env)
             llm_model: Model name (overrides .env)
             llm_api_key: API key for the LLM service (overrides .env)
+            personality_type: Personality to use ('trivia' or 'hacker_jeopardy')
         """
         # Initialize services
         self.meshtastic = MeshtasticService()
@@ -59,16 +61,28 @@ class MeshtasticBot:
         self.llm_host = self.llm.base_url
         self.llm_model = self.llm.model
         
-        # Initialize database and personality
+        # Initialize database
         self.db = BotDatabase(db_path=config.DATABASE_PATH)
-        self.personality = TriviaPersonality(
-            self.db, 
-            questions_file=config.TRIVIA_QUESTIONS_FILE,
-            llm_service=self.llm
-        )
+        
+        # Initialize personality based on type
+        if personality_type == 'hacker_jeopardy':
+            self.personality = HackerJeopardyPersonality(
+                self.db,
+                self.meshtastic,
+                llm_service=self.llm,
+                questions_file=config.HJ_QUESTIONS_FILE,
+                admin_node_ids=config.HJ_ADMIN_NODE_IDS
+            )
+            self.llm_channel_name = config.HJ_GAME_CHANNEL_NAME
+        else:
+            self.personality = TriviaPersonality(
+                self.db, 
+                questions_file=config.TRIVIA_QUESTIONS_FILE,
+                llm_service=self.llm
+            )
+            self.llm_channel_name = config.LLM_CHANNEL_NAME
         
         # Runtime state
-        self.llm_channel_name = config.LLM_CHANNEL_NAME
         self.llm_channel_index = None
         self.shutdown_requested = False
     
@@ -123,11 +137,33 @@ class MeshtasticBot:
         
         print(f"📨 [Ch {channel}] [{sender_name}]: {text}")
         
-        # Check if this is a DM (channel 0) or the configured LLM channel
+        # Check if this is a DM (channel 0) or the configured channel
         is_dm = channel == 0
+        is_game_channel = (self.llm_channel_index is not None and 
+                          channel == self.llm_channel_index)
+        
+        # For Hacker Jeopardy, handle channel commands
+        if isinstance(self.personality, HackerJeopardyPersonality):
+            # Handle !join and !hj start from the game channel
+            text_lower = text.lower().strip()
+            if is_game_channel and text_lower in ['!join', '!hj join']:
+                response = self.personality.handle_message(text, sender_id, sender_name)
+                if response:
+                    # Send DM response
+                    print(f"🤖 Replying to {sender_name} (DM): {response}")
+                    self.meshtastic.send_text(response, destination=sender_id)
+                return
+            
+            if is_game_channel and text_lower == '!hj start':
+                response = self.personality.handle_message(text, sender_id, sender_name)
+                if response:
+                    # Send DM response to admin
+                    print(f"🤖 Replying to {sender_name} (DM): {response}")
+                    self.meshtastic.send_text(response, destination=sender_id)
+                return
+        
+        # For trivia mode, handle !llm command
         is_llm_command = text.lower().strip().startswith('!llm ')
-        is_llm_channel = (self.llm_channel_index is not None and 
-                            channel == self.llm_channel_index)
         
         # Handle !llm command
         # - On DMs: always respond via DM (for testing)
@@ -145,7 +181,7 @@ class MeshtasticBot:
                             time.sleep(0.5)
                     else:
                         self.meshtastic.send_text(response, destination=sender_id)
-                elif is_llm_channel:
+                elif is_game_channel:
                     # Channel response
                     print(f"🤖 Replying to channel {channel} ({self.llm_channel_name}): {response}")
                     if len(response) > 200:
@@ -160,7 +196,7 @@ class MeshtasticBot:
                     print(f"⚠️  Ignoring !llm on channel {channel} (not DM or '{self.llm_channel_name}')")
             return
         
-        # For all other commands (trivia, leaderboard, etc.), only respond to DMs
+        # For all other commands, only respond to DMs
         # Skip if it's a channel message (not a DM)
         if not is_dm:
             return
@@ -211,18 +247,19 @@ class MeshtasticBot:
         if self.llm_channel_index is not None:
             print(f"✅ Found channel '{self.llm_channel_name}' at index {self.llm_channel_index}")
         else:
-            print(f"⚠️  Channel '{self.llm_channel_name}' not found - !llm will only work in DMs")
+            print(f"⚠️  Channel '{self.llm_channel_name}' not found - limited functionality")
         
-        # Ask first question (for internal state, don't broadcast)
-        msg, _ = self.personality.ask_new_question()
+        # For Trivia personality, ask first question
+        if isinstance(self.personality, TriviaPersonality):
+            msg, _ = self.personality.ask_new_question()
+            print(f"\n💡 Ready! Current question: {msg}")
         
         print("\n📡 LISTENING FOR:")
-        print(f"  • DMs: !trivia, !leaderboard, !llm, !help")
+        print(f"  • DMs: {self.personality.name} commands")
         
         if self.llm_channel_index is not None:
-            print(f"  • #{self.llm_channel_name}: !llm commands")
+            print(f"  • #{self.llm_channel_name}: Channel messages")
         
-        print(f"\n💡 Ready! Current question: {msg}")
         print("="*60 + "\n")
     
     def on_connection_lost(self, interface, topic=None):
@@ -307,8 +344,11 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 Examples:
-  # Run with default settings (auto-detects device, uses local Ollama)
+  # Run with default trivia personality
   python bot.py
+  
+  # Run Hacker Jeopardy mode
+  python bot.py --personality hacker_jeopardy
   
   # Use custom LLM settings (Ollama)
   python bot.py --llm-base-url http://192.168.1.100:11434/v1 --llm-model llama3.2:3b
@@ -316,6 +356,13 @@ Examples:
   # Use OpenAI
   python bot.py --llm-base-url https://api.openai.com/v1 --llm-model gpt-4 --llm-api-key sk-...
         '''
+    )
+    
+    parser.add_argument(
+        '--personality', '-p',
+        choices=['trivia', 'hacker_jeopardy'],
+        default='trivia',
+        help='Personality to use (default: trivia)'
     )
     
     parser.add_argument(
@@ -341,6 +388,7 @@ Examples:
     bot = MeshtasticBot(
         llm_base_url=args.llm_base_url,
         llm_model=args.llm_model,
-        llm_api_key=args.llm_api_key
+        llm_api_key=args.llm_api_key,
+        personality_type=args.personality
     )
     bot.run()

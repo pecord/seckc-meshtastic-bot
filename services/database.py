@@ -55,6 +55,54 @@ class BotDatabase:
                       answered_at TEXT,
                       UNIQUE(node_id, question_id))''')
         
+        # Hacker Jeopardy game sessions
+        c.execute('''CREATE TABLE IF NOT EXISTS hj_sessions
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      started_at TEXT,
+                      ended_at TEXT,
+                      status TEXT,
+                      max_rounds INTEGER,
+                      current_round INTEGER DEFAULT 0)''')
+        
+        # Players who have joined a session
+        c.execute('''CREATE TABLE IF NOT EXISTS hj_session_players
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      session_id INTEGER,
+                      user_id TEXT,
+                      username TEXT,
+                      joined_at TEXT,
+                      UNIQUE(session_id, user_id))''')
+        
+        # Questions posted in each session
+        c.execute('''CREATE TABLE IF NOT EXISTS hj_session_questions
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      session_id INTEGER,
+                      question_id TEXT,
+                      question_text TEXT,
+                      point_value INTEGER,
+                      posted_at TEXT,
+                      closes_at TEXT,
+                      correct_answer TEXT)''')
+        
+        # Player answers in each session
+        c.execute('''CREATE TABLE IF NOT EXISTS hj_session_answers
+                     (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      session_id INTEGER,
+                      question_id INTEGER,
+                      node_id TEXT,
+                      username TEXT,
+                      answer_text TEXT,
+                      points_awarded INTEGER,
+                      answered_at TEXT,
+                      UNIQUE(session_id, question_id, node_id))''')
+        
+        # Banned users
+        c.execute('''CREATE TABLE IF NOT EXISTS banned_users
+                     (node_id TEXT PRIMARY KEY,
+                      banned_at TEXT,
+                      banned_by TEXT,
+                      reason TEXT)''')
+        
         conn.commit()
         conn.close()
         print(f"✅ Database initialized: {self.db_path}")
@@ -115,3 +163,158 @@ class BotDatabase:
         result = c.fetchone()
         conn.close()
         return result
+    
+    # ===== Hacker Jeopardy Methods =====
+    
+    def is_banned(self, node_id):
+        """Check if a user is banned"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute('SELECT node_id FROM banned_users WHERE node_id = ?', (node_id,))
+        result = c.fetchone()
+        conn.close()
+        return result is not None
+    
+    def ban_user(self, node_id, banned_by, reason=""):
+        """Ban a user from participating"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute('''INSERT OR REPLACE INTO banned_users (node_id, banned_at, banned_by, reason)
+                    VALUES (?, ?, ?, ?)''',
+                 (node_id, datetime.now().isoformat(), banned_by, reason))
+        conn.commit()
+        conn.close()
+    
+    def unban_user(self, node_id):
+        """Unban a user"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute('DELETE FROM banned_users WHERE node_id = ?', (node_id,))
+        conn.commit()
+        conn.close()
+    
+    def create_hj_session(self, max_rounds):
+        """Create a new Hacker Jeopardy game session"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute('''INSERT INTO hj_sessions (started_at, status, max_rounds, current_round)
+                    VALUES (?, ?, ?, ?)''',
+                 (datetime.now().isoformat(), 'ACTIVE', max_rounds, 0))
+        session_id = c.lastrowid
+        conn.commit()
+        conn.close()
+        return session_id
+    
+    def end_hj_session(self, session_id):
+        """End a Hacker Jeopardy session"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute('''UPDATE hj_sessions SET ended_at = ?, status = ?
+                    WHERE id = ?''',
+                 (datetime.now().isoformat(), 'ENDED', session_id))
+        conn.commit()
+        conn.close()
+    
+    def record_hj_question(self, session_id, question_id, question_text, point_value, 
+                          correct_answer, closes_at):
+        """Record a question posted in a session"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute('''INSERT INTO hj_session_questions 
+                    (session_id, question_id, question_text, point_value, posted_at, closes_at, correct_answer)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                 (session_id, question_id, question_text, point_value, 
+                  datetime.now().isoformat(), closes_at, correct_answer))
+        db_question_id = c.lastrowid
+        
+        # Increment round counter
+        c.execute('UPDATE hj_sessions SET current_round = current_round + 1 WHERE id = ?', 
+                 (session_id,))
+        conn.commit()
+        conn.close()
+        return db_question_id
+    
+    def record_hj_answer(self, session_id, question_id, node_id, username, 
+                        answer_text, points_awarded):
+        """
+        Record a player's answer for a question
+        
+        Returns:
+            True if answer was recorded
+            False if player already answered this question
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        try:
+            c.execute('''INSERT INTO hj_session_answers 
+                        (session_id, question_id, node_id, username, answer_text, 
+                         points_awarded, answered_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                     (session_id, question_id, node_id, username, answer_text,
+                      points_awarded, datetime.now().isoformat()))
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.IntegrityError:
+            conn.close()
+            return False  # Already answered this question
+    
+    def get_hj_session_leaderboard(self, session_id, limit=10):
+        """Get leaderboard for a specific HJ session"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute('''SELECT username, SUM(points_awarded) as total_points
+                    FROM hj_session_answers
+                    WHERE session_id = ?
+                    GROUP BY node_id, username
+                    ORDER BY total_points DESC
+                    LIMIT ?''', (session_id, limit))
+        results = c.fetchall()
+        conn.close()
+        return results
+    
+    def get_hj_session_info(self, session_id):
+        """Get session info including current round and max rounds"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute('''SELECT current_round, max_rounds, status
+                    FROM hj_sessions
+                    WHERE id = ?''', (session_id,))
+        result = c.fetchone()
+        conn.close()
+        return result
+    
+    def add_player_to_session(self, session_id, user_id, username):
+        """
+        Add a player to a session
+        
+        Returns:
+            True if player was added
+            False if player was already in session
+        """
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        try:
+            c.execute('''INSERT INTO hj_session_players (session_id, user_id, username, joined_at)
+                        VALUES (?, ?, ?, ?)''',
+                     (session_id, user_id, username, datetime.now().isoformat()))
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.IntegrityError:
+            conn.close()
+            return False  # Already in session
+    
+    def get_session_players(self, session_id):
+        """Get list of players in a session as (user_id, username) tuples"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        c.execute('''SELECT user_id, username
+                    FROM hj_session_players
+                    WHERE session_id = ?
+                    ORDER BY joined_at''', (session_id,))
+        results = c.fetchall()
+        conn.close()
+        return results
